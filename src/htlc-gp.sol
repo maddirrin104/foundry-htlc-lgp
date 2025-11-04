@@ -1,20 +1,18 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract htlc_lgp is ReentrancyGuard {
-    // using token ERC20 safe transfer from
+contract HashedTimelockERC20_GP is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // lock struct
     struct Lock {
-        address sender;
-        address receiver;
+        address sender; // Alice
+        address receiver; // Bob
         address tokenContract;
         uint256 amount;
         uint256 unlockTime;
-        uint256 timeBased;
         uint256 depositRequired;
         uint256 depositPaid;
         uint256 depositWindowEnd;
@@ -23,41 +21,36 @@ contract htlc_lgp is ReentrancyGuard {
         bool refunded;
     }
 
-    // lock mapping
     mapping(bytes32 => Lock) public locks;
-        event LockCreated(
+
+    event LockCreated(
         bytes32 indexed lockId,
         address indexed sender,
         address indexed receiver,
         address tokenContract,
         uint256 amount,
         uint256 unlockTime,
-        uint256 timeBased,
         uint256 depositRequired,
         uint256 depositWindowEnd
     );
 
     event DepositConfirmed(bytes32 indexed lockId, address indexed receiver, uint256 amount);
-    event LockClaimed(bytes32 indexed lockId, address indexed receiver, uint256 penalty);
+    event LockClaimed(bytes32 indexed lockId, address indexed receiver);
     event LockRefunded(bytes32 indexed lockId, address indexed sender, uint256 penalty);
 
-    //create lock
-    function lock(
+    function createLock(
         address _receiver,
         address _tokenContract,
-        bytes32 _hashlock,
         uint256 _amount,
+        bytes32 _hashlock,
         uint256 _timelock,
-        uint256 _timeBased,
         uint256 _depositRequired,
         uint256 _depositWindow
     ) external nonReentrant returns (bytes32 lockId) {
-        require(_timeBased > 0 && _timeBased < _timelock, "Invalid timeBased");
-        require(_timeBased + _depositWindow < _timelock, "timeBased + depositWindow must be < timelock");
         require(_receiver != address(0), "Invalid receiver");
         require(_tokenContract != address(0), "Invalid token");
         require(_amount > 0, "Amount must be > 0");
-        require(locks[_hashlock].sender == address(0), "Lock already exists");
+        require(locks[_hashlock].sender == address(0), "Lock already exists for this hash");
 
         uint256 _unlockTime = block.timestamp + _timelock;
         uint256 _depositWindowEnd = block.timestamp + _depositWindow;
@@ -68,7 +61,6 @@ contract htlc_lgp is ReentrancyGuard {
             tokenContract: _tokenContract,
             amount: _amount,
             unlockTime: _unlockTime,
-            timeBased: _timeBased,
             depositRequired: _depositRequired,
             depositPaid: 0,
             depositWindowEnd: _depositWindowEnd,
@@ -77,10 +69,11 @@ contract htlc_lgp is ReentrancyGuard {
             refunded: false
         });
 
-        IERC20(_tokenContract).safeTransferFrom(
-            msg.sender, 
-            address(this), 
-            _amount
+        // transfer tokens from Alice into contract (Alice must approve first)
+        IERC20(_tokenContract).safeTransferFrom(msg.sender, address(this), _amount);
+
+        emit LockCreated(
+            _hashlock, msg.sender, _receiver, _tokenContract, _amount, _unlockTime, _depositRequired, _depositWindowEnd
         );
         return _hashlock;
     }
@@ -109,44 +102,21 @@ contract htlc_lgp is ReentrancyGuard {
         require(lk.depositConfirmed, "Receiver did not confirm deposit");
         require(block.timestamp < lk.unlockTime, "Lock expired");
 
-        uint256 penalty = 0;
-        uint256 penaltyWindowStart = lk.unlockTime - lk.timeBased;
-        if (block.timestamp > penaltyWindowStart) {
-            uint256 elapsed = block.timestamp - penaltyWindowStart;
-            if (elapsed > lk.timeBased) elapsed = lk.timeBased;
-            // linear penalty proportional to elapsed/timeBased
-            // penalty = depositRequired * elapsed / timeBased
-            penalty = (lk.depositRequired * elapsed) / lk.timeBased;
-            if (penalty > lk.depositPaid) penalty = lk.depositPaid;
-        } else {
-            penalty = 0;
-        }
-
-        uint256 depositBack = 0;
-        if (lk.depositPaid > penalty) depositBack = lk.depositPaid - penalty;
-        else depositBack = 0;
-
         lk.claimed = true;
 
-        // transfer token to receiver
+        // transfer ERC20 to receiver
         IERC20(lk.tokenContract).safeTransfer(lk.receiver, lk.amount);
 
-        // zero stored deposit before external calls
-        lk.depositPaid = 0;
-
-        // pay penalty to sender immediately if >0
-        if (penalty > 0) {
-            (bool sentP,) = payable(lk.sender).call{value: penalty}("");
-            require(sentP, "Pay penalty failed");
-        }
-
-        // refund the remaining deposit (if any) to receiver
+        // refund deposit to receiver
+        uint256 depositBack = lk.depositPaid;
         if (depositBack > 0) {
-            (bool sentR,) = payable(lk.receiver).call{value: depositBack}("");
-            require(sentR, "Refund deposit failed");
+            // zero the stored deposit first to avoid re-entrancy issues
+            lk.depositPaid = 0;
+            (bool sent,) = payable(lk.receiver).call{value: depositBack}("");
+            require(sent, "Refund deposit failed");
         }
 
-        emit LockClaimed(_lockId, lk.receiver, penalty);
+        emit LockClaimed(_lockId, lk.receiver);
     }
 
     function refund(bytes32 _lockId) external nonReentrant {
@@ -198,5 +168,4 @@ contract htlc_lgp is ReentrancyGuard {
     fallback() external payable {
         revert("Fallback not supported");
     }
-
 }
