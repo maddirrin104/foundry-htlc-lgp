@@ -146,10 +146,12 @@ contract htlc_lgp is ReentrancyGuard {
         emit LockClaimed(_lockId, lk.receiver, penalty);
     }
 
+    // claim without signature
     function claim(bytes32 _lockId, bytes calldata _preimage) external nonReentrant {
         _claim(_lockId, _preimage, msg.sender);
     }
 
+    // claim with signature
     function claimWithSig(
         bytes32 _lockId,
         bytes calldata _preimage,
@@ -161,6 +163,11 @@ contract htlc_lgp is ReentrancyGuard {
 
         (bytes32 r, bytes32 s, uint8 v) = _splitSig(_sig);
 
+        // convert 0/1 -> 27/28 nếu cần
+        if (v < 27) {
+            v += 27;
+        }
+
         // digest = lockId (PoC đơn giản)
         bytes32 digest = _lockId;
 
@@ -169,6 +176,7 @@ contract htlc_lgp is ReentrancyGuard {
 
         _claim(_lockId, _preimage, msg.sender);
     }
+
 
     function _splitSig(bytes memory sig) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
         require(sig.length == 65, "invalid sig length");

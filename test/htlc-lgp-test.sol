@@ -15,7 +15,7 @@ contract htlc_lgp_test is Test {
 
     function setUp() public {
         token = new MockToken();
-        htlc  = new htlc_lgp();
+        htlc  = new htlc_lgp(deployer);
 
         // Mint token cho sender
         token.mint(sender, 1_000e18);
