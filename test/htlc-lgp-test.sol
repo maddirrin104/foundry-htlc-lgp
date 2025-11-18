@@ -10,18 +10,18 @@ contract htlc_lgp_test is Test {
     htlc_lgp htlc;
 
     address deployer = address(this);
-    address sender   = address(0xA11CE);
+    address sender = address(0xA11CE);
     address receiver = address(0xB0B);
 
     function setUp() public {
         token = new MockToken();
-        htlc  = new htlc_lgp(deployer);
+        htlc = new htlc_lgp(deployer);
 
         // Mint token cho sender
         token.mint(sender, 1_000e18);
 
         // Fund ETH cho sender & receiver để trả gas / nộp deposit
-        vm.deal(sender,   100 ether);
+        vm.deal(sender, 100 ether);
         vm.deal(receiver, 100 ether);
     }
 
@@ -31,11 +31,11 @@ contract htlc_lgp_test is Test {
     }
 
     function testA_ConfirmDeposit_ClaimInPenaltyWindow() public {
-        uint256 amount          = 100e18;
-        uint256 timelock        = 1800; // 30'
-        uint256 timeBased       = 600;  // penalty window 10'
+        uint256 amount = 100e18;
+        uint256 timelock = 1800; // 30'
+        uint256 timeBased = 600; // penalty window 10'
         uint256 depositRequired = 1 ether;
-        uint256 depositWindow   = 600;  // 10'
+        uint256 depositWindow = 600; // 10'
 
         bytes memory preimage = bytes("super-secret-preimage");
         bytes32 lockId = sha256(preimage); // dùng đúng sha256 như contract
@@ -44,16 +44,7 @@ contract htlc_lgp_test is Test {
 
         // sender lock
         vm.prank(sender);
-        htlc.lock(
-            receiver,
-            address(token),
-            lockId,
-            amount,
-            timelock,
-            timeBased,
-            depositRequired,
-            depositWindow
-        );
+        htlc.lock(receiver, address(token), lockId, amount, timelock, timeBased, depositRequired, depositWindow);
 
         // receiver confirm deposit
         vm.prank(receiver);
@@ -86,11 +77,11 @@ contract htlc_lgp_test is Test {
     }
 
     function testB_NoDeposit_UntilWindowEnds_SenderRefundImmediate() public {
-        uint256 amount          = 50e18;
-        uint256 timelock        = 1800;
-        uint256 timeBased       = 600;
+        uint256 amount = 50e18;
+        uint256 timelock = 1800;
+        uint256 timeBased = 600;
         uint256 depositRequired = 1 ether;
-        uint256 depositWindow   = 300;
+        uint256 depositWindow = 300;
 
         bytes memory preimage = bytes("no-deposit-preimage");
         bytes32 lockId = sha256(preimage);
@@ -99,16 +90,7 @@ contract htlc_lgp_test is Test {
 
         // sender lock
         vm.prank(sender);
-        htlc.lock(
-            receiver,
-            address(token),
-            lockId,
-            amount,
-            timelock,
-            timeBased,
-            depositRequired,
-            depositWindow
-        );
+        htlc.lock(receiver, address(token), lockId, amount, timelock, timeBased, depositRequired, depositWindow);
 
         // Không confirm deposit. Chờ qua depositWindow
         vm.warp(block.timestamp + depositWindow + 1);
@@ -124,11 +106,11 @@ contract htlc_lgp_test is Test {
     }
 
     function testC_DepositConfirmed_ButTimeout_SenderRefundAll() public {
-        uint256 amount          = 70e18;
-        uint256 timelock        = 1200;
-        uint256 timeBased       = 300;
+        uint256 amount = 70e18;
+        uint256 timelock = 1200;
+        uint256 timeBased = 300;
         uint256 depositRequired = 0.5 ether;
-        uint256 depositWindow   = 300;
+        uint256 depositWindow = 300;
 
         bytes memory preimage = bytes("confirm-but-timeout");
         bytes32 lockId = sha256(preimage);
@@ -137,16 +119,7 @@ contract htlc_lgp_test is Test {
 
         // lock
         vm.prank(sender);
-        htlc.lock(
-            receiver,
-            address(token),
-            lockId,
-            amount,
-            timelock,
-            timeBased,
-            depositRequired,
-            depositWindow
-        );
+        htlc.lock(receiver, address(token), lockId, amount, timelock, timeBased, depositRequired, depositWindow);
 
         // receiver confirm
         vm.prank(receiver);
@@ -164,7 +137,7 @@ contract htlc_lgp_test is Test {
         vm.prank(sender);
         htlc.refund(lockId);
 
-        assertEq(token.balanceOf(sender), 1_000e18);  // 1000 - 70 + 70
+        assertEq(token.balanceOf(sender), 1_000e18); // 1000 - 70 + 70
         // không assert chặt chẽ ETH do gas; event đã xác nhận penalty
         assertEq(address(htlc).balance, 0);
         assertGt(sender.balance, senderEthBefore); // về nguyên tắc có +deposit (trừ gas)

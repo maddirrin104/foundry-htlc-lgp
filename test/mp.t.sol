@@ -19,7 +19,7 @@ contract MP_MultiPartyTest is Test {
     address C = address(0xC0C0A);
 
     // preimage/hashlock chung cho 2 hop
-    bytes  preimage = bytes("mp-multi-party-preimage");
+    bytes preimage = bytes("mp-multi-party-preimage");
     bytes32 H;
 
     function setUp() public {
@@ -43,47 +43,29 @@ contract MP_MultiPartyTest is Test {
     /// Happy path: C claim sớm ở hop2 (penalty=0), B dùng preimage claim hop1 (penalty=0).
     function test_MultiHop_HappyPath_NoPenalty() public {
         // --- Tham số hop2 (B->C) trên "Chain B" ---
-        uint256 amtB2C          = 200e18;
-        uint256 timelock_B2C    = 1_200; // ngắn hơn
-        uint256 timeBased_B2C   =   400;
-        uint256 deposit_B2C     = 1 ether;
-        uint256 depositWin_B2C  =   300;
+        uint256 amtB2C = 200e18;
+        uint256 timelock_B2C = 1_200; // ngắn hơn
+        uint256 timeBased_B2C = 400;
+        uint256 deposit_B2C = 1 ether;
+        uint256 depositWin_B2C = 300;
 
         // --- Tham số hop1 (A->B) trên "Chain A" ---
-        uint256 amtA2B          = 100e18;
-        uint256 timelock_A2B    = 1_800; // dài hơn hop2
-        uint256 timeBased_A2B   =   600;
-        uint256 deposit_A2B     = 1 ether;
-        uint256 depositWin_A2B  =   300;
+        uint256 amtA2B = 100e18;
+        uint256 timelock_A2B = 1_800; // dài hơn hop2
+        uint256 timeBased_A2B = 600;
+        uint256 deposit_A2B = 1 ether;
+        uint256 depositWin_A2B = 300;
 
         // A approve & lock cho B ở hop1
         vm.startPrank(A);
         tokenA.approve(address(htlcA), amtA2B);
-        htlcA.lock(
-            B,
-            address(tokenA),
-            H,
-            amtA2B,
-            timelock_A2B,
-            timeBased_A2B,
-            deposit_A2B,
-            depositWin_A2B
-        );
+        htlcA.lock(B, address(tokenA), H, amtA2B, timelock_A2B, timeBased_A2B, deposit_A2B, depositWin_A2B);
         vm.stopPrank();
 
         // B approve & lock cho C ở hop2
         vm.startPrank(B);
         tokenB.approve(address(htlcB), amtB2C);
-        htlcB.lock(
-            C,
-            address(tokenB),
-            H,
-            amtB2C,
-            timelock_B2C,
-            timeBased_B2C,
-            deposit_B2C,
-            depositWin_B2C
-        );
+        htlcB.lock(C, address(tokenB), H, amtB2C, timelock_B2C, timeBased_B2C, deposit_B2C, depositWin_B2C);
         vm.stopPrank();
 
         // C confirm deposit hop2
@@ -109,20 +91,20 @@ contract MP_MultiPartyTest is Test {
         assertEq(tokenA.balanceOf(B), amtA2B);
     }
 
-    /// Griefing 1: C cố tình claim trễ ở hop2 => C bị penalty tuyến tính trả cho B, 
+    /// Griefing 1: C cố tình claim trễ ở hop2 => C bị penalty tuyến tính trả cho B,
     /// nhưng B vẫn kịp claim hop1 trước khi hết hạn => A không nhận penalty.
     function test_MultiHop_Griefing_C_Delays_But_B_Still_Claims() public {
-        uint256 amtB2C          = 200e18;
-        uint256 timelock_B2C    = 1_200;
-        uint256 timeBased_B2C   =   400;
-        uint256 deposit_B2C     = 1 ether;
-        uint256 depositWin_B2C  =   300;
+        uint256 amtB2C = 200e18;
+        uint256 timelock_B2C = 1_200;
+        uint256 timeBased_B2C = 400;
+        uint256 deposit_B2C = 1 ether;
+        uint256 depositWin_B2C = 300;
 
-        uint256 amtA2B          = 100e18;
-        uint256 timelock_A2B    = 1_800;
-        uint256 timeBased_A2B   =   600;
-        uint256 deposit_A2B     = 1 ether;
-        uint256 depositWin_A2B  =   300;
+        uint256 amtA2B = 100e18;
+        uint256 timelock_A2B = 1_800;
+        uint256 timeBased_A2B = 600;
+        uint256 deposit_A2B = 1 ether;
+        uint256 depositWin_A2B = 300;
 
         // Khóa như test trên
         vm.startPrank(A);
@@ -147,7 +129,7 @@ contract MP_MultiPartyTest is Test {
 
         // C claim (penalty ~ 50% deposit_B2C trả cho B)
         vm.expectEmit(true, true, true, true);
-        emit htlc_lgp.LockClaimed(H, C, (deposit_B2C * (timeBased_B2C/2)) / timeBased_B2C);
+        emit htlc_lgp.LockClaimed(H, C, (deposit_B2C * (timeBased_B2C / 2)) / timeBased_B2C);
         vm.prank(C);
         htlcB.claim(H, preimage);
 
@@ -155,7 +137,7 @@ contract MP_MultiPartyTest is Test {
         vm.prank(B);
         htlcA.claim(H, preimage);
 
-        // Kết quả: 
+        // Kết quả:
         // - C nhận tokenB nhưng mất ~50% deposit cho B (qua event)
         // - B nhận tokenA (không bị penalty ở hop1)
         assertEq(tokenB.balanceOf(C), amtB2C);
@@ -164,17 +146,17 @@ contract MP_MultiPartyTest is Test {
 
     /// Griefing 2: C delay quá lâu khiến B claim cũng cận hạn hop1 => B có thể dính penalty ở hop1 (trả cho A).
     function test_MultiHop_Griefing_C_Delays_And_B_Also_Pays_Penalty() public {
-        uint256 amtB2C          = 200e18;
-        uint256 timelock_B2C    = 1_200;
-        uint256 timeBased_B2C   =   400;
-        uint256 deposit_B2C     = 1 ether;
-        uint256 depositWin_B2C  =   300;
+        uint256 amtB2C = 200e18;
+        uint256 timelock_B2C = 1_200;
+        uint256 timeBased_B2C = 400;
+        uint256 deposit_B2C = 1 ether;
+        uint256 depositWin_B2C = 300;
 
-        uint256 amtA2B          = 100e18;
-        uint256 timelock_A2B    = 1_800; // > 1_200 nhưng không quá nhiều
-        uint256 timeBased_A2B   =   600;
-        uint256 deposit_A2B     = 1 ether;
-        uint256 depositWin_A2B  =   300;
+        uint256 amtA2B = 100e18;
+        uint256 timelock_A2B = 1_800; // > 1_200 nhưng không quá nhiều
+        uint256 timeBased_A2B = 600;
+        uint256 deposit_A2B = 1 ether;
+        uint256 depositWin_A2B = 300;
 
         vm.startPrank(A);
         tokenA.approve(address(htlcA), amtA2B);
@@ -201,16 +183,16 @@ contract MP_MultiPartyTest is Test {
         // nhưng ta đã warp khá xa; để chắc chắn vào giữa penalty window hop1:
         uint256 nowTs = block.timestamp;
         // đảm bảo ít nhất giữa penalty window hop1
-        vm.warp(nowTs + (timelock_A2B - timeBased_A2B)/2);
+        vm.warp(nowTs + (timelock_A2B - timeBased_A2B) / 2);
 
         // B claim ở hop1 → B trả penalty tuyến tính cho A
         vm.expectEmit(true, true, true, true);
         // (Không tính exact do rounding/time, chỉ xác nhận event xuất hiện)
-        emit htlc_lgp.LockClaimed(H, B, 0); 
+        emit htlc_lgp.LockClaimed(H, B, 0);
         vm.prank(B);
         htlcA.claim(H, preimage);
 
-        // Kết quả: 
+        // Kết quả:
         // - C nhận tokenB nhưng mất gần full deposit cho B (event hop2).
         // - B nhận tokenA nhưng bị mất 1 phần deposit_A2B cho A (event hop1).
         assertEq(tokenB.balanceOf(C), amtB2C);

@@ -7,8 +7,9 @@ contract htlc_lgp is ReentrancyGuard {
     // using token ERC20 safe transfer from
     using SafeERC20 for IERC20;
 
-    // TSS signer   
+    // TSS signer
     address public immutable tssSigner;
+
     constructor(address _tssSigner) {
         require(_tssSigner != address(0), "invalid TSS signer");
         tssSigner = _tssSigner;
@@ -32,7 +33,7 @@ contract htlc_lgp is ReentrancyGuard {
 
     // lock mapping
     mapping(bytes32 => Lock) public locks;
-        event LockCreated(
+    event LockCreated(
         bytes32 indexed lockId,
         address indexed sender,
         address indexed receiver,
@@ -84,11 +85,7 @@ contract htlc_lgp is ReentrancyGuard {
             refunded: false
         });
 
-        IERC20(_tokenContract).safeTransferFrom(
-            msg.sender, 
-            address(this), 
-            _amount
-        );
+        IERC20(_tokenContract).safeTransferFrom(msg.sender, address(this), _amount);
         return _hashlock;
     }
 
@@ -152,11 +149,7 @@ contract htlc_lgp is ReentrancyGuard {
     }
 
     // claim with signature
-    function claimWithSig(
-        bytes32 _lockId,
-        bytes calldata _preimage,
-        bytes calldata _sig
-    ) external nonReentrant {
+    function claimWithSig(bytes32 _lockId, bytes calldata _preimage, bytes calldata _sig) external nonReentrant {
         Lock storage lk = locks[_lockId];
         require(lk.sender != address(0), "Lock not found");
         require(msg.sender == lk.receiver, "Only receiver can claim");
@@ -177,7 +170,6 @@ contract htlc_lgp is ReentrancyGuard {
         _claim(_lockId, _preimage, msg.sender);
     }
 
-
     function _splitSig(bytes memory sig) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
         require(sig.length == 65, "invalid sig length");
         assembly {
@@ -186,8 +178,6 @@ contract htlc_lgp is ReentrancyGuard {
             v := byte(0, mload(add(sig, 96)))
         }
     }
-
-
 
     function refund(bytes32 _lockId) external nonReentrant {
         Lock storage lk = locks[_lockId];
@@ -238,5 +228,4 @@ contract htlc_lgp is ReentrancyGuard {
     fallback() external payable {
         revert("Fallback not supported");
     }
-
 }
