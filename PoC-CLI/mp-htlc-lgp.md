@@ -62,6 +62,10 @@ cast rpc anvil_setBalance $ADDR_RECEIVER 0x56bc75e2d63100000 --rpc-url $RPC
 cast send $ADDR_TOKEN "mint(address,uint256)" $ADDR_TSS 1000000000000000000000 \
   --private-key $PK_RECEIVER \
   --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 ```
 
 #### Mượn danh EOA_TSS
@@ -74,6 +78,10 @@ cast rpc anvil_setBalance $ADDR_TSS 0x56bc75e2d63100000 --rpc-url $RPC  # 100 ET
 ```bash
 cast send $ADDR_TOKEN "approve(address,uint256)" $ADDR_HTLC 100000000000000000000 \
   --from $ADDR_TSS --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 ```
 
 #### Tạo preimage & lockId (sha256)
@@ -87,6 +95,10 @@ export PREIMAGE_HEX=0x$(echo -n "super-secret-preimage" | xxd -p -c 200)
 cast send $ADDR_HTLC "lock(address,address,bytes32,uint256,uint256,uint256,uint256,uint256)(bytes32)" \
   $ADDR_RECEIVER $ADDR_TOKEN $LOCK_ID 100000000000000000000 1800 600 1000000000000000000 600 \
   --from $ADDR_TSS --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 ```
 
 #### Receiver nộp deposit
@@ -95,16 +107,24 @@ cast send $ADDR_HTLC "confirmParticipation(bytes32)" $LOCK_ID \
   --value 1000000000000000000 \
   --private-key $PK_RECEIVER \
   --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 ```
 
 ## PoC
 ### Scenario 1: Claim sớm (không penalty)
 > Chạy flow trên đến bước confirmParticipation
 ```bash
-cast send $ADDR_HTLC "claimWithSig(bytes32,bytes,bytes)" \
+time cast send $ADDR_HTLC "claimWithSig(bytes32,bytes,bytes)" \
   $LOCK_ID $PREIMAGE_HEX $SIG \
   --private-key $PK_RECEIVER \
   --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 
 cast call $ADDR_TOKEN "balanceOf(address)(uint256)" $ADDR_RECEIVER --rpc-url $RPC
 ```
@@ -115,10 +135,14 @@ cast call $ADDR_TOKEN "balanceOf(address)(uint256)" $ADDR_RECEIVER --rpc-url $RP
 cast rpc evm_increaseTime '[1201]' --rpc-url $RPC
 cast rpc evm_mine '[]' --rpc-url $RPC
 
-cast send $ADDR_HTLC "claimWithSig(bytes32,bytes,bytes)" \
+time cast send $ADDR_HTLC "claimWithSig(bytes32,bytes,bytes)" \
   $LOCK_ID $PREIMAGE_HEX $SIG \
   --private-key $PK_RECEIVER \
   --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 ```
 
 ### Scenario 3: Deposit đã confirm nhưng không claim, sender refund
@@ -127,8 +151,12 @@ cast send $ADDR_HTLC "claimWithSig(bytes32,bytes,bytes)" \
 cast rpc evm_increaseTime '[1801]' --rpc-url $RPC
 cast rpc evm_mine '[]' --rpc-url $RPC
 
-cast send $ADDR_HTLC "refund(bytes32)" $LOCK_ID \
+time cast send $ADDR_HTLC "refund(bytes32)" $LOCK_ID \
   --from $ADDR_TSS --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 
 cast call $ADDR_TOKEN "balanceOf(address)(uint256)" $ADDR_TSS --rpc-url $RPC
 cast balance $ADDR_TSS --rpc-url $RPC
@@ -140,8 +168,12 @@ cast balance $ADDR_TSS --rpc-url $RPC
 cast rpc evm_increaseTime '[601]' --rpc-url $RPC
 cast rpc evm_mine '[]' --rpc-url $RPC
 
-cast send $ADDR_HTLC "refund(bytes32)" $LOCK_ID \
+time cast send $ADDR_HTLC "refund(bytes32)" $LOCK_ID \
   --from $ADDR_TSS --rpc-url $RPC
+
+## Sau mỗi lệnh cast send, thêm một bước lấy receipt:
+TX_HASH=<hash tx lock/claim/refund>
+cast receipt $TX_HASH --rpc-url $RPC
 
 cast call $ADDR_TOKEN "balanceOf(address)(uint256)" $ADDR_TSS --rpc-url $RPC
 ```

@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract htlc_gp is ReentrancyGuard {
+contract htlc_gpz is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     struct Lock {
@@ -13,6 +13,7 @@ contract htlc_gp is ReentrancyGuard {
         address tokenContract;
         uint256 amount;
         uint256 unlockTime;
+        uint256 timeBased;
         uint256 depositRequired;
         uint256 depositPaid;
         uint256 depositWindowEnd;
@@ -30,12 +31,13 @@ contract htlc_gp is ReentrancyGuard {
         address tokenContract,
         uint256 amount,
         uint256 unlockTime,
+        uint256 timeBased,
         uint256 depositRequired,
         uint256 depositWindowEnd
     );
 
     event DepositConfirmed(bytes32 indexed lockId, address indexed receiver, uint256 amount);
-    event LockClaimed(bytes32 indexed lockId, address indexed receiver);
+    event LockClaimed(bytes32 indexed lockId, address indexed receiver, uint256 penalty);
     event LockRefunded(bytes32 indexed lockId, address indexed sender, uint256 penalty);
 
     function createLock(
@@ -44,9 +46,11 @@ contract htlc_gp is ReentrancyGuard {
         uint256 _amount,
         bytes32 _hashlock,
         uint256 _timelock,
+        uint256 _timeBased,
         uint256 _depositRequired,
         uint256 _depositWindow
     ) external nonReentrant returns (bytes32 lockId) {
+        require(_timeBased > 0 && _timeBased <= _timelock, "Invalid timeBased");
         require(_receiver != address(0), "Invalid receiver");
         require(_tokenContract != address(0), "Invalid token");
         require(_amount > 0, "Amount must be > 0");
@@ -61,6 +65,7 @@ contract htlc_gp is ReentrancyGuard {
             tokenContract: _tokenContract,
             amount: _amount,
             unlockTime: _unlockTime,
+            timeBased: _timeBased,
             depositRequired: _depositRequired,
             depositPaid: 0,
             depositWindowEnd: _depositWindowEnd,
@@ -73,7 +78,15 @@ contract htlc_gp is ReentrancyGuard {
         IERC20(_tokenContract).safeTransferFrom(msg.sender, address(this), _amount);
 
         emit LockCreated(
-            _hashlock, msg.sender, _receiver, _tokenContract, _amount, _unlockTime, _depositRequired, _depositWindowEnd
+            _hashlock,
+            msg.sender,
+            _receiver,
+            _tokenContract,
+            _amount,
+            _unlockTime,
+            _timeBased,
+            _depositRequired,
+            _depositWindowEnd
         );
         return _hashlock;
     }
@@ -102,21 +115,44 @@ contract htlc_gp is ReentrancyGuard {
         require(lk.depositConfirmed, "Receiver did not confirm deposit");
         require(block.timestamp < lk.unlockTime, "Lock expired");
 
-        lk.claimed = true;
-
-        // transfer ERC20 to receiver
-        IERC20(lk.tokenContract).safeTransfer(lk.receiver, lk.amount);
-
-        // refund deposit to receiver
-        uint256 depositBack = lk.depositPaid;
-        if (depositBack > 0) {
-            // zero the stored deposit first to avoid re-entrancy issues
-            lk.depositPaid = 0;
-            (bool sent,) = payable(lk.receiver).call{value: depositBack}("");
-            require(sent, "Refund deposit failed");
+        uint256 penalty = 0;
+        uint256 penaltyWindowStart = lk.unlockTime - lk.timeBased;
+        if (block.timestamp > penaltyWindowStart) {
+            uint256 elapsed = block.timestamp - penaltyWindowStart;
+            if (elapsed > lk.timeBased) elapsed = lk.timeBased;
+            // linear penalty proportional to elapsed/timeBased
+            // penalty = depositRequired * elapsed / timeBased
+            penalty = (lk.depositRequired * elapsed) / lk.timeBased;
+            if (penalty > lk.depositPaid) penalty = lk.depositPaid;
+        } else {
+            penalty = 0;
         }
 
-        emit LockClaimed(_lockId, lk.receiver);
+        uint256 depositBack = 0;
+        if (lk.depositPaid > penalty) depositBack = lk.depositPaid - penalty;
+        else depositBack = 0;
+
+        lk.claimed = true;
+
+        // transfer token to receiver
+        IERC20(lk.tokenContract).safeTransfer(lk.receiver, lk.amount);
+
+        // zero stored deposit before external calls
+        lk.depositPaid = 0;
+
+        // pay penalty to sender immediately if >0
+        if (penalty > 0) {
+            (bool sentP,) = payable(lk.sender).call{value: penalty}("");
+            require(sentP, "Pay penalty failed");
+        }
+
+        // refund the remaining deposit (if any) to receiver
+        if (depositBack > 0) {
+            (bool sentR,) = payable(lk.receiver).call{value: depositBack}("");
+            require(sentR, "Refund deposit failed");
+        }
+
+        emit LockClaimed(_lockId, lk.receiver, penalty);
     }
 
     function refund(bytes32 _lockId) external nonReentrant {
