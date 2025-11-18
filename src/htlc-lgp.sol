@@ -7,6 +7,13 @@ contract htlc_lgp is ReentrancyGuard {
     // using token ERC20 safe transfer from
     using SafeERC20 for IERC20;
 
+    // TSS signer   
+    address public immutable tssSigner;
+    constructor(address _tssSigner) {
+        require(_tssSigner != address(0), "invalid TSS signer");
+        tssSigner = _tssSigner;
+    }
+
     // lock struct
     struct Lock {
         address sender;
@@ -100,11 +107,11 @@ contract htlc_lgp is ReentrancyGuard {
         emit DepositConfirmed(_lockId, msg.sender, msg.value);
     }
 
-    function claim(bytes32 _lockId, bytes calldata _preimage) external nonReentrant {
+    function _claim(bytes32 _lockId, bytes calldata _preimage, address _receiver) internal {
         require(sha256(_preimage) == _lockId, "Invalid preimage");
         Lock storage lk = locks[_lockId];
         require(lk.sender != address(0), "Lock not found");
-        require(msg.sender == lk.receiver, "Only receiver can claim");
+        require(_receiver == lk.receiver, "Only receiver can claim");
         require(!lk.claimed && !lk.refunded, "Already finished");
         require(lk.depositConfirmed, "Receiver did not confirm deposit");
         require(block.timestamp < lk.unlockTime, "Lock expired");
@@ -114,33 +121,23 @@ contract htlc_lgp is ReentrancyGuard {
         if (block.timestamp > penaltyWindowStart) {
             uint256 elapsed = block.timestamp - penaltyWindowStart;
             if (elapsed > lk.timeBased) elapsed = lk.timeBased;
-            // linear penalty proportional to elapsed/timeBased
-            // penalty = depositRequired * elapsed / timeBased
             penalty = (lk.depositRequired * elapsed) / lk.timeBased;
             if (penalty > lk.depositPaid) penalty = lk.depositPaid;
-        } else {
-            penalty = 0;
         }
 
         uint256 depositBack = 0;
         if (lk.depositPaid > penalty) depositBack = lk.depositPaid - penalty;
-        else depositBack = 0;
 
         lk.claimed = true;
-
-        // transfer token to receiver
         IERC20(lk.tokenContract).safeTransfer(lk.receiver, lk.amount);
 
-        // zero stored deposit before external calls
         lk.depositPaid = 0;
 
-        // pay penalty to sender immediately if >0
         if (penalty > 0) {
             (bool sentP,) = payable(lk.sender).call{value: penalty}("");
             require(sentP, "Pay penalty failed");
         }
 
-        // refund the remaining deposit (if any) to receiver
         if (depositBack > 0) {
             (bool sentR,) = payable(lk.receiver).call{value: depositBack}("");
             require(sentR, "Refund deposit failed");
@@ -148,6 +145,41 @@ contract htlc_lgp is ReentrancyGuard {
 
         emit LockClaimed(_lockId, lk.receiver, penalty);
     }
+
+    function claim(bytes32 _lockId, bytes calldata _preimage) external nonReentrant {
+        _claim(_lockId, _preimage, msg.sender);
+    }
+
+    function claimWithSig(
+        bytes32 _lockId,
+        bytes calldata _preimage,
+        bytes calldata _sig
+    ) external nonReentrant {
+        Lock storage lk = locks[_lockId];
+        require(lk.sender != address(0), "Lock not found");
+        require(msg.sender == lk.receiver, "Only receiver can claim");
+
+        (bytes32 r, bytes32 s, uint8 v) = _splitSig(_sig);
+
+        // digest = lockId (PoC đơn giản)
+        bytes32 digest = _lockId;
+
+        address signer = ecrecover(digest, v, r, s);
+        require(signer == tssSigner, "invalid TSS signature");
+
+        _claim(_lockId, _preimage, msg.sender);
+    }
+
+    function _splitSig(bytes memory sig) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
+        require(sig.length == 65, "invalid sig length");
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := byte(0, mload(add(sig, 96)))
+        }
+    }
+
+
 
     function refund(bytes32 _lockId) external nonReentrant {
         Lock storage lk = locks[_lockId];
