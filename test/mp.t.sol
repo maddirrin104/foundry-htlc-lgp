@@ -23,8 +23,8 @@ contract MP_MultiPartyTest is Test {
     bytes32 H;
 
     function setUp() public {
-        htlcA = new htlc_lgp();
-        htlcB = new htlc_lgp();
+        htlcA = new htlc_lgp(A);
+        htlcB = new htlc_lgp(B);
 
         tokenA = new MockToken();
         tokenB = new MockToken();
