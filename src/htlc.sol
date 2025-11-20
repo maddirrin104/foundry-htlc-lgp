@@ -17,15 +17,22 @@ contract htlc {
     mapping(bytes32 => Lock) public locks;
 
     event LogLockCreated(
-        bytes32 indexed lockId, address indexed sender, address indexed receiver, address tokenContract, uint256 amount
+        bytes32 indexed lockId,
+        address indexed sender,
+        address indexed receiver,
+        address tokenContract,
+        uint256 amount
     );
     event LogLockClaimed(bytes32 indexed lockId);
     event LogLockRefunded(bytes32 indexed lockId);
 
-    function lock(address _receiver, address _tokenContract, uint256 _amount, bytes32 _hashlock, uint256 _timelock)
-        public
-        returns (bytes32 lockId)
-    {
+    function lock(
+        address _receiver,
+        address _tokenContract,
+        uint256 _amount,
+        bytes32 _hashlock,
+        uint256 _timelock
+    ) public returns (bytes32 lockId) {
         require(locks[_hashlock].sender == address(0), "Lock already exists");
         require(_amount > 0, "Amount must be greater than 0");
 
@@ -40,15 +47,13 @@ contract htlc {
             refunded: false
         });
 
-        //sender call approve()
-        // require(IERC20(_tokenContract).transferFrom(msg.sender, address(this), _amount), "transfer failed");
-        uint256 before = IERC20(_tokenContract).balanceOf(address(this));
+        uint256 beforeBal = IERC20(_tokenContract).balanceOf(address(this));
         IERC20(_tokenContract).transferFrom(msg.sender, address(this), _amount);
-        uint256 received = IERC20(_tokenContract).balanceOf(address(this)) - before;
+        uint256 received = IERC20(_tokenContract).balanceOf(address(this)) - beforeBal;
         require(received > 0, "zero received");
         locks[_hashlock].amount = received;
-        emit LogLockCreated(_hashlock, msg.sender, _receiver, _tokenContract, received);
 
+        emit LogLockCreated(_hashlock, msg.sender, _receiver, _tokenContract, received);
         return _hashlock;
     }
 
@@ -56,11 +61,10 @@ contract htlc {
         require(sha256(_preimage) == _lockId, "Invalid preimage");
         Lock storage locked = locks[_lockId];
         require(msg.sender == locked.receiver, "Only receiver can claim");
-        require(!locked.claimed);
-        require(!locked.refunded);
-        require(block.timestamp < locked.unlockTime);
+        require(!locked.claimed, "already claimed");
+        require(!locked.refunded, "already refunded");
+        require(block.timestamp < locked.unlockTime, "timelock passed");
 
-        // update trước để tránh re-entrancy
         locked.claimed = true;
         require(IERC20(locked.tokenContract).transfer(locked.receiver, locked.amount), "Token transfer failed");
 
@@ -70,9 +74,9 @@ contract htlc {
     function refund(bytes32 _lockId) public {
         Lock storage locked = locks[_lockId];
         require(msg.sender == locked.sender, "Only sender can refund");
-        require(!locked.claimed);
-        require(!locked.refunded);
-        require(block.timestamp >= locked.unlockTime);
+        require(!locked.claimed, "already claimed");
+        require(!locked.refunded, "already refunded");
+        require(block.timestamp >= locked.unlockTime, "timelock not passed");
 
         locked.refunded = true;
         require(IERC20(locked.tokenContract).transfer(locked.sender, locked.amount), "Token transfer failed");
