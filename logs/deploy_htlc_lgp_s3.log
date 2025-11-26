@@ -1,0 +1,32 @@
+Compiling 31 files with Solc 0.8.30
+Solc 0.8.30 finished in 1.77s
+Compiler run successful!
+Script ran successfully.
+
+== Logs ==
+  MockToken: 0xCD8a1C3ba11CF5ECfa6267617243239504a98d90
+  HTLC-LGP : 0x82e01223d51Eb87e16A03E24687EDF0F294da6f1
+  TSS signer: 0xDF60E9810A68a5828315Cd6367797c41c9009453
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 31337
+
+Estimated gas price: 0.000006935 gwei
+
+Estimated total gas used for script: 4514855
+
+Estimated amount required: 0.000000031310519425 ETH
+
+==========================
+
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /home/maddirrin/projects/foundry-htlc-lgp/broadcast/htlc-lgp-script.s.sol/31337/run-latest.json
+
+Sensitive values saved to: /home/maddirrin/projects/foundry-htlc-lgp/cache/htlc-lgp-script.s.sol/31337/run-latest.json

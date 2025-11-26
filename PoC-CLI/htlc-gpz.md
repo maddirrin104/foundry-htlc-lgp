@@ -2,7 +2,6 @@
 ```bash
 anvil
 ```
-
 ## Deploy 
 ```bash
 export RPC=http://127.0.0.1:8545
