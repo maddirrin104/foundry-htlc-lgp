@@ -16,11 +16,11 @@ contract mp_htlc is ReentrancyGuard {
     }
 
     struct Lock {
-        address sender;        // TSS address (đa bên)
-        address receiver;      // EOA của người nhận trên chain này
+        address sender; // TSS address (đa bên)
+        address receiver; // EOA của người nhận trên chain này
         address tokenContract; // ERC20
         uint256 amount;
-        uint256 unlockTime;    // block.timestamp + timelock
+        uint256 unlockTime; // block.timestamp + timelock
         bool claimed;
         bool refunded;
     }
@@ -45,13 +45,11 @@ contract mp_htlc is ReentrancyGuard {
     /// @param _hashlock sha256(preimage)
     /// @param _amount số lượng token
     /// @param _timelock số giây từ block.timestamp tới khi hết hạn
-    function lock(
-        address _receiver,
-        address _tokenContract,
-        bytes32 _hashlock,
-        uint256 _amount,
-        uint256 _timelock
-    ) external nonReentrant returns (bytes32 lockId) {
+    function lock(address _receiver, address _tokenContract, bytes32 _hashlock, uint256 _amount, uint256 _timelock)
+        external
+        nonReentrant
+        returns (bytes32 lockId)
+    {
         require(_receiver != address(0), "invalid receiver");
         require(_tokenContract != address(0), "invalid token");
         require(_amount > 0, "amount must be > 0");
@@ -70,31 +68,16 @@ contract mp_htlc is ReentrancyGuard {
             refunded: false
         });
 
-        IERC20(_tokenContract).safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
+        IERC20(_tokenContract).safeTransferFrom(msg.sender, address(this), _amount);
 
-        emit LockCreated(
-            _hashlock,
-            msg.sender,
-            _receiver,
-            _tokenContract,
-            _amount,
-            _unlockTime
-        );
+        emit LockCreated(_hashlock, msg.sender, _receiver, _tokenContract, _amount, _unlockTime);
 
         return _hashlock;
     }
 
     // ============ INTERNAL ============
 
-    function _claim(
-        bytes32 _lockId,
-        bytes calldata _preimage,
-        address _receiver
-    ) internal {
+    function _claim(bytes32 _lockId, bytes calldata _preimage, address _receiver) internal {
         require(sha256(_preimage) == _lockId, "invalid preimage");
 
         Lock storage lk = locks[_lockId];
@@ -112,20 +95,13 @@ contract mp_htlc is ReentrancyGuard {
     // ============ CLAIM ============
 
     /// @notice claim kiểu HTLC truyền thống: chỉ cần preimage
-    function claim(bytes32 _lockId, bytes calldata _preimage)
-        external
-        nonReentrant
-    {
+    function claim(bytes32 _lockId, bytes calldata _preimage) external nonReentrant {
         _claim(_lockId, _preimage, msg.sender);
     }
 
     /// @notice claim kèm chữ ký MPC/TSS trên lockId
     /// @dev digest = lockId (PoC), sig = ethSig(65) từ Go MPC/TSS
-    function claimWithSig(
-        bytes32 _lockId,
-        bytes calldata _preimage,
-        bytes calldata _sig
-    ) external nonReentrant {
+    function claimWithSig(bytes32 _lockId, bytes calldata _preimage, bytes calldata _sig) external nonReentrant {
         Lock storage lk = locks[_lockId];
         require(lk.sender != address(0), "lock not found");
         require(msg.sender == lk.receiver, "only receiver");
@@ -143,11 +119,7 @@ contract mp_htlc is ReentrancyGuard {
         _claim(_lockId, _preimage, msg.sender);
     }
 
-    function _splitSig(bytes memory sig)
-        internal
-        pure
-        returns (bytes32 r, bytes32 s, uint8 v)
-    {
+    function _splitSig(bytes memory sig) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
         require(sig.length == 65, "invalid sig length");
         assembly {
             r := mload(add(sig, 32))
