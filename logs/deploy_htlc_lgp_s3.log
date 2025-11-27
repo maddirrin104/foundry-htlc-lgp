@@ -1,12 +1,12 @@
 Compiling 31 files with Solc 0.8.30
-Solc 0.8.30 finished in 1.77s
+Solc 0.8.30 finished in 1.94s
 Compiler run successful!
 Script ran successfully.
 
 == Logs ==
-  MockToken: 0xCD8a1C3ba11CF5ECfa6267617243239504a98d90
-  HTLC-LGP : 0x82e01223d51Eb87e16A03E24687EDF0F294da6f1
-  TSS signer: 0xDF60E9810A68a5828315Cd6367797c41c9009453
+  MockToken: 0x610178dA211FEF7D417bC0e6FeD39F05609AD788
+  HTLC-LGP : 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
+  TSS signer: 0x8601a60A54292b79Bd3Fe6AAfa3B4FE59dad6B72
 
 ## Setting up 1 EVM.
 
@@ -14,11 +14,11 @@ Script ran successfully.
 
 Chain 31337
 
-Estimated gas price: 0.000006935 gwei
+Estimated gas price: 0.100057847 gwei
 
-Estimated total gas used for script: 4514855
+Estimated total gas used for script: 4514871
 
-Estimated amount required: 0.000000031310519425 ETH
+Estimated amount required: 0.000451748271742737 ETH
 
 ==========================
 

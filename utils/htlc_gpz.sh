@@ -61,6 +61,8 @@ mkdir -p logs
 deploy_contracts() {
   log "Deploy MockToken + HTLC-GPZ bằng forge script"
 
+  export PRIVATE_KEY="$PK_DEPLOY"
+
   DEPLOY_LOG=$(forge script script/htlc-gpz-script.s.sol:htlc_gpz_script \
     --rpc-url "$RPC" \
     --private-key "$PK_DEPLOY" \
@@ -264,7 +266,7 @@ scenario_3() {
     --rpc-url "$RPC"
 
   echo "[*] Nhảy thời gian ~ TIMELOCK-1 (=1799)..."
-  cast rpc evm_increaseTime 1799 --rpc-url "$RPC"
+  cast rpc evm_increaseTime 1798 --rpc-url "$RPC"
   cast rpc evm_mine --rpc-url "$RPC"
 
   echo "[*] claim S3 (sát unlockTime)..."

@@ -89,6 +89,8 @@ deploy_and_setup_env() {
   local label="$1"
 
   log "[$label] Deploy MockToken + HTLC-LGP bằng forge script"
+  
+  export PRIVATE_KEY="$PK_DEPLOY"
 
   DEPLOY_LOG=$(forge script script/htlc-lgp-script.s.sol:htlc_lgp_script \
     --rpc-url "$RPC" \

@@ -63,6 +63,8 @@ deploy_contracts() {
 
   mkdir -p logs
 
+  export PRIVATE_KEY="$PK_DEPLOY"
+
   DEPLOY_LOG=$(forge script script/htlc-gp-script.s.sol:htlc_gp_script \
     --rpc-url "$RPC" \
     --private-key "$PK_DEPLOY" \

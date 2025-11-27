@@ -67,6 +67,8 @@ trap cleanup EXIT
 deploy_contracts() {
   log "Deploy MockToken + HTLC_TRAD bằng forge script"
 
+  export PRIVATE_KEY="$PK_DEPLOY"
+
   DEPLOY_LOG=$(forge script script/htlc-script.s.sol:htlc_script \
     --rpc-url "$RPC" \
     --private-key "$PK_DEPLOY" \
